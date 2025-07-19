@@ -9,7 +9,7 @@ const featuredProductsCache = {
 
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find({}); // find all products
+    const products = await Product.find({});
     res.json({ products });
   } catch (error) {
     console.log("Error in getAllProducts controller", error.message);
@@ -24,9 +24,9 @@ export const getFeaturedProducts = async (req, res) => {
       return res.json(featuredProductsCache.data);
     }
 
-    const featuredProducts = await Product.find({ isFeatured: true }).lean();
+    const featuredProducts = await Product.find({ isFeatured: true });
 
-    if (!featuredProducts) {
+    if (!featuredProducts.length) {
       return res.status(404).json({ message: "No featured products found" });
     }
 
@@ -50,15 +50,18 @@ export const createProduct = async (req, res) => {
       cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
     }
 
-    const product = await Product.create({
+    const newProduct = new Product({
       name,
       description,
       price,
-      image: cloudinaryResponse?.secure_url ? cloudinaryResponse.secure_url : "",
+      image: cloudinaryResponse?.secure_url || "",
       category,
+      isFeatured: false,
     });
 
-    res.status(201).json(product);
+    await newProduct.save();
+
+    res.status(201).json(newProduct);
   } catch (error) {
     console.log("Error in createProduct controller", error.message);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -77,9 +80,9 @@ export const deleteProduct = async (req, res) => {
       const publicId = product.image.split("/").pop().split(".")[0];
       try {
         await cloudinary.uploader.destroy(`products/${publicId}`);
-        console.log("deleted image from cloduinary");
+        console.log("deleted image from cloudinary");
       } catch (error) {
-        console.log("error deleting image from cloduinary", error);
+        console.log("error deleting image from cloudinary", error);
       }
     }
 
@@ -94,21 +97,7 @@ export const deleteProduct = async (req, res) => {
 
 export const getRecommendedProducts = async (req, res) => {
   try {
-    const products = await Product.aggregate([
-      {
-        $sample: { size: 4 },
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          description: 1,
-          image: 1,
-          price: 1,
-        },
-      },
-    ]);
-
+    const products = await Product.aggregate([{ $sample: { size: 4 } }]);
     res.json(products);
   } catch (error) {
     console.log("Error in getRecommendedProducts controller", error.message);
@@ -130,11 +119,12 @@ export const getProductsByCategory = async (req, res) => {
 export const toggleFeaturedProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
+
     if (product) {
       product.isFeatured = !product.isFeatured;
-      const updatedProduct = await product.save();
-      updateFeaturedProductsCache();
-      res.json(updatedProduct);
+      await product.save();
+      await updateFeaturedProductsCache();
+      res.json(product);
     } else {
       res.status(404).json({ message: "Product not found" });
     }
@@ -146,7 +136,7 @@ export const toggleFeaturedProduct = async (req, res) => {
 
 async function updateFeaturedProductsCache() {
   try {
-    const featuredProducts = await Product.find({ isFeatured: true }).lean();
+    const featuredProducts = await Product.find({ isFeatured: true });
     featuredProductsCache.data = featuredProducts;
     featuredProductsCache.timestamp = Date.now();
   } catch (error) {

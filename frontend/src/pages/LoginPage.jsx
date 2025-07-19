@@ -1,19 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LogIn, Mail, Lock, ArrowRight, Loader } from "lucide-react";
 import { useUserStore } from "../stores/useUserStore";
 
 const LoginPage = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [role, setRole] = useState("customer");
 
-	const { login, loading } = useUserStore();
+	const { login, loading, user } = useUserStore();
+	const navigate = useNavigate();
+
+	useEffect(() => {
+		if (user) {
+			if (user.role === "customer") {
+				navigate("/customer");
+			} else if (user.role === "vendor") {
+				navigate("/vendor");
+			}
+		}
+	}, [user, navigate]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		console.log(email, password);
-		login(email, password);
+		login(email, password, role);
 	};
 
 	return (
@@ -56,6 +67,17 @@ const LoginPage = () => {
 									placeholder='you@example.com'
 								/>
 							</div>
+						</div>
+						<div className="mb-4">
+							<label className="block text-sm font-medium text-gray-300 mb-1">User Type</label>
+							<select
+								value={role}
+								onChange={(e) => setRole(e.target.value)}
+								className="block w-full rounded-md bg-gray-700 border border-gray-600 text-white p-2"
+							>
+								<option value="customer">Customer</option>
+								<option value="vendor">Vendor</option>
+							</select>
 						</div>
 
 						<div>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { UserPlus, Mail, Lock, User, ArrowRight, Loader } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../stores/useUserStore";
@@ -10,9 +10,21 @@ const SignUpPage = () => {
 		email: "",
 		password: "",
 		confirmPassword: "",
+		role: "customer",
 	});
 
-	const { signup, loading } = useUserStore();
+	const { signup, loading, user } = useUserStore();
+	const navigate = useNavigate();
+
+	useEffect(() => {
+		if (user) {
+			if (user.role === "customer") {
+				navigate("/customer");
+			} else if (user.role === "vendor") {
+				navigate("/vendor");
+			}
+		}
+	}, [user, navigate]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
@@ -57,6 +69,17 @@ const SignUpPage = () => {
 									placeholder='John Doe'
 								/>
 							</div>
+						</div>
+						<div className="mb-4">
+							<label className="block text-sm font-medium text-gray-300 mb-1">User Type</label>
+							<select
+								value={formData.role}
+								onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+								className="block w-full rounded-md bg-gray-700 border border-gray-600 text-white p-2"
+							>
+								<option value="customer">Customer</option>
+								<option value="vendor">Vendor</option>
+							</select>
 						</div>
 
 						<div>

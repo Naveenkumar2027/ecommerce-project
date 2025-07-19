@@ -1,5 +1,6 @@
-import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import User from "../models/user.model.js";
 
 const generateTokens = (userId) => {
 	const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
@@ -53,25 +54,35 @@ const setCookies = (res, accessToken, refreshToken) => {
 };
 
 export const signup = async (req, res) => {
-	const { email, password, name } = req.body;
+	const { email, password, name, role } = req.body;
 	try {
 		const userExists = await User.findOne({ email });
-
 		if (userExists) {
 			return res.status(400).json({ message: "User already exists" });
 		}
-		const user = await User.create({ name, email, password });
 
-		const { accessToken, refreshToken } = generateTokens(user._id);
-		await storeRefreshToken(user._id, refreshToken);
+		const userRole = role && ["customer", "admin", "vendor"].includes(role) ? role : "customer";
+
+		const newUser = new User({
+			name,
+			email,
+			password,
+			role: userRole,
+		});
+
+		await newUser.save();
+
+		const userId = newUser._id;
+		const { accessToken, refreshToken } = generateTokens(userId);
+		await storeRefreshToken(userId.toString(), refreshToken);
 
 		setCookies(res, accessToken, refreshToken);
 
 		res.status(201).json({
-			_id: user._id,
-			name: user.name,
-			email: user.email,
-			role: user.role,
+			_id: userId,
+			name,
+			email,
+			role: userRole,
 		});
 	} catch (error) {
 		console.log("Error in signup controller", error.message);
@@ -81,12 +92,15 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
 	try {
-		const { email, password } = req.body;
+		const { email, password, role } = req.body;
 		const user = await User.findOne({ email });
 
 		if (user && (await user.comparePassword(password))) {
+			if (role && user.role !== role) {
+				return res.status(403).json({ message: "User role mismatch" });
+			}
 			const { accessToken, refreshToken } = generateTokens(user._id);
-			await storeRefreshToken(user._id, refreshToken);
+			await storeRefreshToken(user._id.toString(), refreshToken);
 			setCookies(res, accessToken, refreshToken);
 
 			res.json({
